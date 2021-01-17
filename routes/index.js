@@ -12,12 +12,10 @@ const client = new Twitter({
 
 router.post('/', function(request, response) {
     // requestを確認
-    const payload = request.body.payload
-    if (!payload) {
-	return response.json({message: 'リクエストパラメータ payload がありません。'})
+    const url = request.body.url
+    if (!url) {
+	return response.json({message: 'リクエストパラメータ url がありません。'})
     }
-
-    // payloadから画像URLを抜き出す
 
     // WIP: ツイートから画像URLを取得する
     client.get(
