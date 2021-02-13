@@ -1,5 +1,7 @@
 var express = require('express');
 var router = express.Router();
+const https = require('https');
+const fs = require('fs');
 
 const Twitter = require('twitter-v2');
  
@@ -9,6 +11,14 @@ const client = new Twitter({
   access_token_key: process.env.TWITTER_ACESS_TOKEN_KEY,
   access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
 });
+
+const dropboxV2Api = require('dropbox-v2-api');
+
+const dropbox = dropboxV2Api.authenticate({
+    token: process.env.DROPBOX_TOKEN
+});
+
+const STORE_DROPBOX_PATH = '/twitter';
 
 router.post('/', async function(request, response) {
     // requestを確認
@@ -20,13 +30,10 @@ router.post('/', async function(request, response) {
 
     // ツイートから画像URLを取得する
     const imageUrl = await getImageUrl(tweetId);
-
-    // 画像を取得
-    // Dropbox APIにそのまま渡せるかどうか
-
-    // Dropbox APIのcreateを叩く
     
-    
+    // Dropboxに保存する
+    saveToDropBox(imageUrl);
+
     response.json({result: 'success'});
 });
 
@@ -43,8 +50,8 @@ const getTweetIdFromUrl = urlString => {
 /**
    tweetに添付されている画像のURLを取得する
 */
-const getImageUrl = async (tweetId) => {
-    const imageUrl = await client.get(
+const getImageUrl = (tweetId) => {
+    return client.get(
 	'tweets/' + tweetId,
 	{
 	    'expansions': 'attachments.media_keys',
@@ -58,13 +65,42 @@ const getImageUrl = async (tweetId) => {
 		if (media.type !== 'photo') return;
 
 		imageUrl = media.url;
+		return;
 	    });
 	}
 
 	return imageUrl;
     });
+}
 
-    return imageUrl;
+/**
+   Dropboxにファイルを保存する
+   すでに同名のファイルがある場合は何もしない
+*/
+const saveToDropBox = async (imageUrl) => {
+    const url = new URL(imageUrl)
+    const filename = url.pathname.substring(url.pathname.lastIndexOf('/') + 1)
+
+    // ファイルを/tmp下にダウンロード
+    let outfile = fs.createWriteStream('/tmp/' + filename);
+    https.get(url, async function(res) {
+	res.pipe(outfile);
+	res.on('end', function (){
+            outfile.close();
+
+	    // DropBoxにアップロード
+	    // TODO: async awaitを使ってきれいに書きたい
+	    dropbox({
+		resource: 'files/upload',
+		parameters: {
+		    path: STORE_DROPBOX_PATH + '/' + filename
+		},
+		readStream: fs.createReadStream('/tmp/' + filename),
+	    }, (err, result, response) => {
+		if (err) { return console.log(err) }
+	    });
+	});
+    });
 }
 
 module.exports = router;
