@@ -10,32 +10,16 @@ const client = new Twitter({
   access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
 });
 
-router.post('/', function(request, response) {
+router.post('/', async function(request, response) {
     // requestを確認
     const url = request.body.url
     if (!url) {
 	return response.json({message: 'リクエストパラメータ url がありません。'})
     }
+    const tweetId = getTweetIdFromUrl(url);
 
-    // WIP: ツイートから画像URLを取得する
-    client.get(
-	'tweets/' + '1350647727554584576',
-	{
-	    'expansions': 'attachments.media_keys',
-	    'media.fields': 'url',
-	}
-    ).then((tweet) => {
-	console.log(tweet);
-	if (tweet.includes && tweet.includes.media) {
-	    tweet.includes.media.forEach((media) => {
-		console.log(media);
-		
-		if (media.type !== 'photo') return;
-		
-		console.log(media.url);
-	    });
-	}
-    })
+    // ツイートから画像URLを取得する
+    const imageUrl = await getImageUrl(tweetId);
 
     // 画像を取得
     // Dropbox APIにそのまま渡せるかどうか
@@ -45,5 +29,42 @@ router.post('/', function(request, response) {
     
     response.json({result: 'success'});
 });
+
+/**
+   tweetのURLからidを抽出する
+   URLは以下のフォーマットを想定している
+   http://twitte r.com/<username>/status/<tweet id>
+*/
+const getTweetIdFromUrl = urlString => {
+    const url = new URL(urlString)
+    return url.pathname.substring(url.pathname.lastIndexOf('/') + 1)
+}
+
+/**
+   tweetに添付されている画像のURLを取得する
+*/
+const getImageUrl = async (tweetId) => {
+    const imageUrl = await client.get(
+	'tweets/' + tweetId,
+	{
+	    'expansions': 'attachments.media_keys',
+	    'media.fields': 'url',
+	}
+    ).then((tweet) => {
+	let imageUrl = '';
+
+	if (tweet.includes && tweet.includes.media) {
+	    tweet.includes.media.forEach((media) => {
+		if (media.type !== 'photo') return;
+
+		imageUrl = media.url;
+	    });
+	}
+
+	return imageUrl;
+    });
+
+    return imageUrl;
+}
 
 module.exports = router;
