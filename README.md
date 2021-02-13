@@ -18,6 +18,7 @@ $ yarn run start
 ```
 
 http://localhost:3000 でアクセスできます。
+IFTTTでwebhookとして使うのでherokuとか適当なサーバにデプロイしておいてください。
 
 # Setup IFTTT
 1. If this に"Twitter: New liked tweet by you."を追加する
